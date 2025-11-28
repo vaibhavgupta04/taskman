@@ -6,34 +6,34 @@ from apps.models import users
 
 
 
-def get_user_by_username(session: Session, username: str):
+async def get_user_by_username(session: Session, username: str):
     stmt = select(users.User).where(users.User.username == username)
     return session.exec(stmt).first()
 
 
-def create_user(session: Session, user: users.User):
+async def create_user(session: Session, user: users.User):
     session.add(user)
     session.commit()
     session.refresh(user)
     return user
 
-def delete_user(session: Session, user: users.User):
+async def delete_user(session: Session, user: users.User):
     session.delete(user)
     session.commit()
     session.refresh()
     return user
 
-def get_user(session: Session, user_id: int) -> Optional[users.User]:
-    stmt = select(users.User).where(users.User.id == user_id)
+async def get_user(session: Session, user_id: int) -> Optional[users.User]:
+    stmt = select(users.User).where(users.User.user_id == user_id)
     return session.exec(stmt).first()
 
 
-def get_user_by_username(session: Session, username: str) -> Optional[users.User]:
+async def get_user_by_username(session: Session, username: str) -> Optional[users.User]:
     stmt = select(users.User).where(users.User.username == username)
     return session.exec(stmt).first()
 
 
-def create_user(session: Session, user_data: Union[users.User, Dict[str, Any]]) -> users.User:
+async def create_user(session: Session, user_data: Union[users.User, Dict[str, Any]]) -> users.User:
     if isinstance(user_data, users.User):
         session.add(user_data)
         session.commit()
@@ -47,8 +47,8 @@ def create_user(session: Session, user_data: Union[users.User, Dict[str, Any]]) 
     return db_user
 
 
-def update_user(session: Session, user_id: int, user_update: Union[users.User, Dict[str, Any]]) -> Optional[users.User]:
-    db_user = get_user(session, user_id)
+async def update_user(session: Session, user_id: int, user_update: Union[users.User, Dict[str, Any]]) -> Optional[users.User]:
+    db_user = await get_user(session, user_id)
     if not db_user:
         return None
 
@@ -67,8 +67,8 @@ def update_user(session: Session, user_id: int, user_update: Union[users.User, D
     return db_user
 
 
-def delete_user_by_id(session: Session, user_id: int) -> Optional[users.User]:
-    db_user = get_user(session, user_id)
+async def delete_user_by_id(session: Session, user_id: int) -> Optional[users.User]:
+    db_user = await get_user(session, user_id)
     if not db_user:
         return None
     session.delete(db_user)
@@ -76,7 +76,7 @@ def delete_user_by_id(session: Session, user_id: int) -> Optional[users.User]:
     return db_user
 
 
-def delete_user(session: Session, user: users.User) -> users.User:
+async def delete_user(session: Session, user: users.User) -> users.User:
     session.delete(user)
     session.commit()
     return user
