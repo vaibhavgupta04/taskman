@@ -1,2 +1,7 @@
 # Virtual environments
 venv/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
