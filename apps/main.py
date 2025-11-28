@@ -26,7 +26,11 @@ async def lifespan(app: FastAPI):
     db_manager.close_db()
 
 
+from apps.routes import users
+
 app = FastAPI(lifespan=lifespan)
+
+app.include_router(users.router, tags=["users"])
 
 @app.get("/")
 def read_root():
