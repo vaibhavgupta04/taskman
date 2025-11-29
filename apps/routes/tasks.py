@@ -2,7 +2,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 from apps.stores.db import get_session
-from apps.models.tasks import Task, TaskCreate, TaskUpdate, TaskRead, TaskStatus, TaskPriority
+from apps.models.tasks import Task, TaskCreate, TaskUpdate, TaskRead, TaskStatus, TaskPriority, BulkTaskUpdate
 from apps.crud import tasks as task_crud
 from apps.auth.dependencies import get_current_user
 from apps.models.users import User
@@ -27,6 +27,14 @@ async def list_tasks(
     current_user: User = Depends(get_current_user)
 ):
     return await task_crud.list_tasks(session, skip, limit, status, priority)
+
+@router.put("/bulk", response_model=List[TaskRead])
+async def bulk_update_tasks(
+    bulk_update: BulkTaskUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    return await task_crud.bulk_update_tasks(session, bulk_update.task_ids, bulk_update.updates)
 
 @router.get("/{task_id}", response_model=TaskRead)
 async def get_task(

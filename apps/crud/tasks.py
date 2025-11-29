@@ -1,11 +1,22 @@
 from typing import List, Optional
 from sqlmodel import Session, select
-from apps.models.tasks import Task, TaskCreate, TaskUpdate, TaskAssignee
+from apps.models.tasks import Task, TaskCreate, TaskUpdate, TaskAssignee, Tag, TaskTag
 from apps.models.users import User
 
 async def create_task(session: Session, task_create: TaskCreate) -> Task:
     db_task = Task.from_orm(task_create)
     
+    # Handle tags if provided
+    if task_create.tag_names:
+        tags = []
+        for tag_name in task_create.tag_names:
+            tag = session.exec(select(Tag).where(Tag.name == tag_name)).first()
+            if not tag:
+                tag = Tag(name=tag_name)
+                session.add(tag)
+            tags.append(tag)
+        db_task.tags = tags
+
     session.add(db_task)
     session.commit()
     session.refresh(db_task)
@@ -50,6 +61,12 @@ async def update_task(session: Session, task_id: int, task_update: TaskUpdate) -
         if assignee_ids is not None:
             assignees = session.exec(select(User).where(User.user_id.in_(assignee_ids))).all()
             db_task.assignees = assignees
+
+    if "tag_ids" in task_data:
+        tag_ids = task_data.pop("tag_ids")
+        if tag_ids is not None:
+            tags = session.exec(select(Tag).where(Tag.tag_id.in_(tag_ids))).all()
+            db_task.tags = tags
             
     for key, value in task_data.items():
         setattr(db_task, key, value)
@@ -84,3 +101,15 @@ async def add_assignee(session: Session, task_id: int, user_id: int) -> Optional
         session.refresh(db_task)
         
     return db_task
+
+async def bulk_update_tasks(session: Session, task_ids: List[int], updates: TaskUpdate) -> List[Task]:
+    updated_tasks = []
+    for task_id in task_ids:
+        # We create a new copy of updates for each task to avoid side effects if update_task modifies it
+        # Although update_task uses .dict(exclude_unset=True), so it should be fine.
+        # But we need to be careful if we wanted to support partial success. 
+        # For now, we'll try to update all.
+        task = await update_task(session, task_id, updates)
+        if task:
+            updated_tasks.append(task)
+    return updated_tasks

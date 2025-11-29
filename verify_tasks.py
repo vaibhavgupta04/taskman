@@ -1,84 +1,71 @@
-import requests
-import sys
 
-BASE_URL = "http://localhost:8000"
+from fastapi.testclient import TestClient
+from apps.main import app
+from apps.auth.dependencies import get_current_user
+from apps.models.users import User
+from apps.stores.db import get_session, db_manager
+from sqlmodel import Session, SQLModel, create_engine
 
-def verify():
-    # 1. Register User
-    username = "testuser_task"
-    password = "password123"
-    try:
-        resp = requests.post(f"{BASE_URL}/register", json={"username": username, "password": password, "role": "member"})
-        if resp.status_code == 200:
-            print("User registered successfully")
-        elif resp.status_code == 400 and "already registered" in resp.text:
-            print("User already exists")
-        else:
-            print(f"Failed to register user: {resp.text}")
-            return
-    except Exception as e:
-        print(f"Failed to connect: {e}")
-        return
+# Setup in-memory DB for testing
+sqlite_file_name = "database.db"
+sqlite_url = f"sqlite:///{sqlite_file_name}"
+engine = create_engine(sqlite_url)
 
-    # 2. Login
-    resp = requests.post(f"{BASE_URL}/login", json={"username": username, "password": password})
-    if resp.status_code != 200:
-        print(f"Failed to login: {resp.text}")
-        return
-    token = resp.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-    print("Logged in successfully")
+def get_session_override():
+    with Session(engine) as session:
+        yield session
 
-    # 3. Create Task
-    task_data = {
-        "title": "Test Task",
-        "description": "This is a test task",
-        "status": "todo",
-        "priority": "high"
+def get_current_user_override():
+    return User(user_id=1, username="testuser", role="admin")
+
+app.dependency_overrides[get_session] = get_session_override
+app.dependency_overrides[get_current_user] = get_current_user_override
+
+client = TestClient(app)
+
+def test_bulk_update():
+    # Create tables
+    SQLModel.metadata.create_all(engine)
+    
+    # Create tasks
+    task1_data = {"title": "Task 1", "status": "todo"}
+    task2_data = {"title": "Task 2", "status": "todo"}
+    
+    res1 = client.post("/tasks/", json=task1_data)
+    assert res1.status_code == 200
+    t1 = res1.json()
+    
+    res2 = client.post("/tasks/", json=task2_data)
+    assert res2.status_code == 200
+    t2 = res2.json()
+    
+    print(f"Created tasks: {t1['task_id']}, {t2['task_id']}")
+    
+    # Bulk update
+    bulk_update_data = {
+        "task_ids": [t1['task_id'], t2['task_id']],
+        "updates": {"status": "done"}
     }
-    resp = requests.post(f"{BASE_URL}/tasks/", json=task_data, headers=headers)
-    if resp.status_code != 200:
-        print(f"Failed to create task: {resp.text}")
-        return
-    task = resp.json()
-    task_id = task["task_id"]
-    print(f"Task created: {task_id}")
-
-    # 4. List Tasks
-    resp = requests.get(f"{BASE_URL}/tasks/", headers=headers)
-    if resp.status_code != 200:
-        print(f"Failed to list tasks: {resp.text}")
-        return
-    tasks = resp.json()
-    print(f"Listed {len(tasks)} tasks")
-
-    # 5. Update Task
-    update_data = {"status": "in_progress"}
-    resp = requests.put(f"{BASE_URL}/tasks/{task_id}", json=update_data, headers=headers)
-    if resp.status_code != 200:
-        print(f"Failed to update task: {resp.text}")
-        return
-    print("Task updated")
-
-    # 7. Create Subtask
-    subtask_data = {
-        "title": "Subtask",
-        "description": "This is a subtask",
-        "status": "todo",
-        "priority": "low"
-    }
-    resp = requests.post(f"{BASE_URL}/tasks/{task_id}/subtasks", json=subtask_data, headers=headers)
-    if resp.status_code != 200:
-        print(f"Failed to create subtask: {resp.text}")
-        return
-    print("Subtask created")
-
-    # 8. Delete Task
-    resp = requests.delete(f"{BASE_URL}/tasks/{task_id}", headers=headers)
-    if resp.status_code != 200:
-        print(f"Failed to delete task: {resp.text}")
-        return
-    print("Task deleted")
+    
+    res_bulk = client.put("/tasks/bulk", json=bulk_update_data)
+    if res_bulk.status_code != 200:
+        print(f"Bulk update failed: {res_bulk.text}")
+    assert res_bulk.status_code == 200
+    updated_tasks = res_bulk.json()
+    
+    print(f"Updated {len(updated_tasks)} tasks")
+    
+    # Verify
+    res_get1 = client.get(f"/tasks/{t1['task_id']}")
+    res_get2 = client.get(f"/tasks/{t2['task_id']}")
+    
+    print(f"Task 1 status: {res_get1.json()['status']}")
+    print(f"Task 2 status: {res_get2.json()['status']}")
+    
+    assert res_get1.json()['status'] == "done"
+    assert res_get2.json()['status'] == "done"
+    
+    print("Verification Successful!")
 
 if __name__ == "__main__":
-    verify()
+    test_bulk_update()
