@@ -105,10 +105,6 @@ async def add_assignee(session: Session, task_id: int, user_id: int) -> Optional
 async def bulk_update_tasks(session: Session, task_ids: List[int], updates: TaskUpdate) -> List[Task]:
     updated_tasks = []
     for task_id in task_ids:
-        # We create a new copy of updates for each task to avoid side effects if update_task modifies it
-        # Although update_task uses .dict(exclude_unset=True), so it should be fine.
-        # But we need to be careful if we wanted to support partial success. 
-        # For now, we'll try to update all.
         task = await update_task(session, task_id, updates)
         if task:
             updated_tasks.append(task)
