@@ -1,4 +1,5 @@
 from typing import List, Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 from apps.stores.db import get_session
@@ -21,12 +22,18 @@ async def create_task(
 async def list_tasks(
     skip: int = 0,
     limit: int = 100,
+    assignee_id: Optional[List[int]] = Query(None),
+    tag_name: Optional[List[str]] = Query(None),
     status: Optional[TaskStatus] = None,
     priority: Optional[TaskPriority] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    return await task_crud.list_tasks(session, skip, limit, status, priority)
+    return await task_crud.list_tasks(
+        session, skip, limit, assignee_id, tag_name, status, priority, start_date, end_date
+    )
 
 @router.put("/bulk", response_model=List[TaskRead])
 async def bulk_update_tasks(

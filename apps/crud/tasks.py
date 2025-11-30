@@ -1,4 +1,5 @@
 from typing import List, Optional
+from datetime import datetime
 from sqlmodel import Session, select
 from apps.models.tasks import Task, TaskCreate, TaskUpdate, TaskAssignee, Tag, TaskTag
 from apps.models.users import User
@@ -37,14 +38,26 @@ async def list_tasks(
     session: Session, 
     skip: int = 0, 
     limit: int = 100,
+    assignee_id: List[int] = None,
+    tag_name: List[str] = None,
     status: Optional[str] = None,
-    priority: Optional[str] = None
+    priority: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
 ) -> List[Task]:
     query = select(Task)
+    if assignee_id:
+        query = query.where(Task.assignees.any(User.user_id.in_(assignee_id)))
+    if tag_name:
+        query = query.where(Task.tags.any(Tag.name.in_(tag_name)))
     if status:
         query = query.where(Task.status == status)
     if priority:
         query = query.where(Task.priority == priority)
+    if start_date:
+        query = query.where(Task.start_date >= start_date)
+    if end_date:
+        query = query.where(Task.end_date <= end_date)
     
     query = query.offset(skip).limit(limit)
     return session.exec(query).all()
