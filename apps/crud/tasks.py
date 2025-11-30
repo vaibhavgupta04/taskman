@@ -1,8 +1,10 @@
 from typing import List, Optional
 from datetime import datetime
 from sqlmodel import Session, select
-from apps.models.tasks import Task, TaskCreate, TaskUpdate, TaskAssignee, Tag, TaskTag
+from apps.models.tasks import Task, TaskCreate, TaskUpdate, TaskAssignee, Tag, TaskTag, TaskPriority
 from apps.models.users import User
+from apps.models.tasks import TaskOverdueSummary, OverdueTask, TaskStatus
+from fastapi import HTTPException
 
 async def create_task(session: Session, task_create: TaskCreate) -> Task:
     db_task = Task.from_orm(task_create)
@@ -21,7 +23,18 @@ async def create_task(session: Session, task_create: TaskCreate) -> Task:
     session.add(db_task)
     session.commit()
     session.refresh(db_task)
+
+    # Handle parent task if provided
+    if task_create.parent_id:
+        parent_task = session.get(Task, task_create.parent_id)
+        if not parent_task:
+            raise HTTPException(status_code=404, detail="Parent task not found")
+        parent_task.subtasks.append(db_task)
+        session.add(parent_task)
+        session.commit()
+        session.refresh(db_task)
     
+    # Handle assignees if provided
     if task_create.assignee_ids:
         assignees = session.exec(select(User).where(User.user_id.in_(task_create.assignee_ids))).all()
         db_task.assignees = assignees
@@ -40,8 +53,8 @@ async def list_tasks(
     limit: int = 100,
     assignee_id: List[int] = None,
     tag_name: List[str] = None,
-    status: Optional[str] = None,
-    priority: Optional[str] = None,
+    status: Optional[TaskStatus] = None,
+    priority: Optional[TaskPriority] = None,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None
 ) -> List[Task]:
@@ -83,7 +96,8 @@ async def update_task(session: Session, task_id: int, task_update: TaskUpdate) -
             
     for key, value in task_data.items():
         setattr(db_task, key, value)
-        
+    
+    db_task.updated_at = datetime.utcnow()
     session.add(db_task)
     session.commit()
     session.refresh(db_task)
@@ -160,11 +174,8 @@ async def get_task_distribution(session: Session) -> List["TaskDistribution"]:
     return list(dist_map.values())
 
 
-async def get_overdue_tasks(session: Session) -> List["UserOverdueSummary"]:
-    from apps.models.tasks import UserOverdueSummary, OverdueTask, TaskStatus
-    
+async def get_overdue_tasks(session: Session) -> List[TaskOverdueSummary]:    
     current_time = datetime.utcnow()
-    
     # Query for overdue tasks not done
     stmt = (
         select(User, Task)
@@ -181,7 +192,7 @@ async def get_overdue_tasks(session: Session) -> List["UserOverdueSummary"]:
     user_map = {}
     for user, task in results:
         if user.user_id not in user_map:
-            user_map[user.user_id] = UserOverdueSummary(
+            user_map[user.user_id] = TaskOverdueSummary(
                 user_id=user.user_id,
                 username=user.username,
                 tasks=[]

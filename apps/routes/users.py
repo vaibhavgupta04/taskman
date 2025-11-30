@@ -10,6 +10,10 @@ router = APIRouter()
 
 @router.post("/register", response_model=User)
 async def register(user: User, session: Session = Depends(get_session)):
+
+    if user.role not in ["admin", "user"]:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    
     db_user = await user_crud.get_user_by_username(session, username=user.username)
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")

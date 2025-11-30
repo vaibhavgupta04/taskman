@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 from apps.stores.db import get_session
-from apps.models.tasks import Task, TaskCreate, TaskUpdate, TaskRead, TaskStatus, TaskPriority, BulkTaskUpdate, TaskDistribution, UserOverdueSummary
+from apps.models.tasks import Task, TaskCreate, TaskUpdate, TaskRead, TaskStatus, TaskPriority, BulkTaskUpdate, TaskDistribution, TaskOverdueSummary
 from apps.crud import tasks as task_crud
 from apps.auth.dependencies import get_current_user, get_current_admin_user
 from apps.models.users import User
@@ -112,7 +112,7 @@ async def get_task_distribution(
 ):
     return await task_crud.get_task_distribution(session)
 
-@router.get("/overdue", response_model=List[UserOverdueSummary])
+@router.get("/overdue", response_model=List[TaskOverdueSummary])
 async def get_overdue_tasks(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)

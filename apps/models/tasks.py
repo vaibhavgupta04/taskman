@@ -76,11 +76,11 @@ class Task(SQLModel, table=True):
 
 class TaskCreate(SQLModel):
     title: str
-    description: Optional[str] = None
-    status: Optional[TaskStatus] = TaskStatus.TODO
-    priority: Optional[TaskPriority] = TaskPriority.MEDIUM
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    description: str
+    status: TaskStatus
+    priority: TaskPriority
+    start_date: datetime
+    end_date: datetime
     parent_id: Optional[int] = None
     assignee_ids: Optional[List[int]] = []
     tag_names: Optional[List[str]] = []
@@ -93,7 +93,6 @@ class TaskUpdate(SQLModel):
     priority: Optional[TaskPriority] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
     parent_id: Optional[int] = None
     assignee_ids: Optional[List[int]] = None
     tag_ids: Optional[List[int]] = None
@@ -102,11 +101,11 @@ class TaskUpdate(SQLModel):
 class TaskRead(SQLModel):
     task_id: int
     title: str
-    description: Optional[str]
+    description: str    
     status: TaskStatus
     priority: TaskPriority
-    start_date: Optional[datetime] 
-    end_date: Optional[datetime]
+    start_date: datetime 
+    end_date: datetime
     created_at: datetime
     updated_at: datetime 
     parent_id: Optional[int]
@@ -134,7 +133,7 @@ class OverdueTask(SQLModel):
     priority: TaskPriority
 
 
-class UserOverdueSummary(SQLModel):
+class TaskOverdueSummary(SQLModel):
     user_id: int
     username: str
     tasks: List[OverdueTask]
