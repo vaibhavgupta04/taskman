@@ -95,19 +95,19 @@ class TaskUpdate(SQLModel):
     end_date: Optional[datetime] = None
     parent_id: Optional[int] = None
     assignee_ids: Optional[List[int]] = None
-    tag_ids: Optional[List[int]] = None
+    tag_names: Optional[List[str]] = None
 
 
 class TaskRead(SQLModel):
     task_id: int
     title: str
-    description: str    
-    status: TaskStatus
-    priority: TaskPriority
-    start_date: datetime 
-    end_date: datetime
-    created_at: datetime
-    updated_at: datetime 
+    description: Optional[str]
+    status: Optional[TaskStatus]
+    priority: Optional[TaskPriority]
+    start_date: Optional[datetime]
+    end_date: Optional[datetime]
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime] 
     parent_id: Optional[int]
     assignees: List[User]
     tags: List[Tag]

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from apps.stores.db import db_manager
-from apps.routes import users, tasks
+from apps.routes import users, tasks, features
 
 app = FastAPI()
 
@@ -29,6 +29,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.include_router(users.router, tags=["users"])
 app.include_router(tasks.router, tags=["tasks"])
+app.include_router(features.router, tags=["features"])
 
 @app.get("/")
 def read_root():
