@@ -122,3 +122,78 @@ async def bulk_update_tasks(session: Session, task_ids: List[int], updates: Task
         if task:
             updated_tasks.append(task)
     return updated_tasks
+
+
+async def get_task_distribution(session: Session) -> List["TaskDistribution"]:
+    from sqlalchemy import func
+    from apps.models.tasks import TaskDistribution, TaskStatus
+    
+    # Query to get counts by user and status
+    # We need to join User, TaskAssignee, and Task
+    stmt = (
+        select(
+            User.user_id,
+            User.username,
+            Task.status,
+            func.count(Task.task_id).label("count")
+        )
+        .join(TaskAssignee, User.user_id == TaskAssignee.user_id)
+        .join(Task, TaskAssignee.task_id == Task.task_id)
+        .group_by(User.user_id, User.username, Task.status)
+    )
+    
+    results = session.exec(stmt).all()
+    
+    # Process results into TaskDistribution objects
+    dist_map = {}
+    for user_id, username, status, count in results:
+        if user_id not in dist_map:
+            dist_map[user_id] = TaskDistribution(user_id=user_id, username=username)
+        
+        if status == TaskStatus.TODO:
+            dist_map[user_id].todo = count
+        elif status == TaskStatus.IN_PROGRESS:
+            dist_map[user_id].in_progress = count
+        elif status == TaskStatus.DONE:
+            dist_map[user_id].done = count
+            
+    return list(dist_map.values())
+
+
+async def get_overdue_tasks(session: Session) -> List["UserOverdueSummary"]:
+    from apps.models.tasks import UserOverdueSummary, OverdueTask, TaskStatus
+    
+    current_time = datetime.utcnow()
+    
+    # Query for overdue tasks not done
+    stmt = (
+        select(User, Task)
+        .join(TaskAssignee, User.user_id == TaskAssignee.user_id)
+        .join(Task, TaskAssignee.task_id == Task.task_id)
+        .where(Task.end_date < current_time)
+        .where(Task.status != TaskStatus.DONE)
+        .order_by(User.username, Task.end_date)
+    )
+    
+    results = session.exec(stmt).all()
+    
+    # Group by user
+    user_map = {}
+    for user, task in results:
+        if user.user_id not in user_map:
+            user_map[user.user_id] = UserOverdueSummary(
+                user_id=user.user_id,
+                username=user.username,
+                tasks=[]
+            )
+        
+        overdue_task = OverdueTask(
+            task_id=task.task_id,
+            title=task.title,
+            due_date=task.end_date,
+            status=task.status,
+            priority=task.priority
+        )
+        user_map[user.user_id].tasks.append(overdue_task)
+        
+    return list(user_map.values())
