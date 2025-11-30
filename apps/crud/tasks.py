@@ -1,8 +1,12 @@
 from typing import List, Optional
 from datetime import datetime
 from sqlmodel import Session, select
-from apps.models.tasks import Task, TaskCreate, TaskUpdate, TaskAssignee, Tag, TaskTag
+from apps.models.tasks import Task, TaskCreate, TaskUpdate, TaskAssignee, Tag, TaskTag, TaskPriority
 from apps.models.users import User
+from apps.models.tasks import TaskOverdueSummary, OverdueTask, TaskStatus
+from fastapi import HTTPException
+from sqlalchemy import func
+from apps.models.tasks import TaskDistribution, TaskStatus
 
 async def create_task(session: Session, task_create: TaskCreate) -> Task:
     db_task = Task.from_orm(task_create)
@@ -21,7 +25,18 @@ async def create_task(session: Session, task_create: TaskCreate) -> Task:
     session.add(db_task)
     session.commit()
     session.refresh(db_task)
+
+    # Handle parent task if provided
+    if task_create.parent_id:
+        parent_task = session.get(Task, task_create.parent_id)
+        if not parent_task:
+            raise HTTPException(status_code=404, detail="Parent task not found")
+        parent_task.subtasks.append(db_task)
+        session.add(parent_task)
+        session.commit()
+        session.refresh(db_task)
     
+    # Handle assignees if provided
     if task_create.assignee_ids:
         assignees = session.exec(select(User).where(User.user_id.in_(task_create.assignee_ids))).all()
         db_task.assignees = assignees
@@ -40,8 +55,8 @@ async def list_tasks(
     limit: int = 100,
     assignee_id: List[int] = None,
     tag_name: List[str] = None,
-    status: Optional[str] = None,
-    priority: Optional[str] = None,
+    status: Optional[TaskStatus] = None,
+    priority: Optional[TaskPriority] = None,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None
 ) -> List[Task]:
@@ -75,15 +90,30 @@ async def update_task(session: Session, task_id: int, task_update: TaskUpdate) -
             assignees = session.exec(select(User).where(User.user_id.in_(assignee_ids))).all()
             db_task.assignees = assignees
 
-    if "tag_ids" in task_data:
-        tag_ids = task_data.pop("tag_ids")
-        if tag_ids is not None:
-            tags = session.exec(select(Tag).where(Tag.tag_id.in_(tag_ids))).all()
+    if "tag_names" in task_data:
+        tag_names = task_data.pop("tag_names")
+        if tag_names is not None:
+            tags = []
+            for tag_name in tag_names:
+                tag = session.exec(select(Tag).where(Tag.name == tag_name)).first()
+                if not tag:
+                    tag = Tag(name=tag_name)
+                    session.add(tag)
+                tags.append(tag)
             db_task.tags = tags
+
+    if "parent_id" in task_data:
+        parent_id = task_data.pop("parent_id")
+        if parent_id is not None:
+            parent_task = session.get(Task, parent_id)
+            if not parent_task:
+                raise HTTPException(status_code=404, detail="Parent task not found")
+            db_task.parent = parent_task
             
     for key, value in task_data.items():
         setattr(db_task, key, value)
-        
+    
+    db_task.updated_at = datetime.utcnow()
     session.add(db_task)
     session.commit()
     session.refresh(db_task)
@@ -124,12 +154,7 @@ async def bulk_update_tasks(session: Session, task_ids: List[int], updates: Task
     return updated_tasks
 
 
-async def get_task_distribution(session: Session) -> List["TaskDistribution"]:
-    from sqlalchemy import func
-    from apps.models.tasks import TaskDistribution, TaskStatus
-    
-    # Query to get counts by user and status
-    # We need to join User, TaskAssignee, and Task
+async def get_task_distribution(session: Session) -> List[TaskDistribution]:
     stmt = (
         select(
             User.user_id,
@@ -144,7 +169,6 @@ async def get_task_distribution(session: Session) -> List["TaskDistribution"]:
     
     results = session.exec(stmt).all()
     
-    # Process results into TaskDistribution objects
     dist_map = {}
     for user_id, username, status, count in results:
         if user_id not in dist_map:
@@ -160,12 +184,8 @@ async def get_task_distribution(session: Session) -> List["TaskDistribution"]:
     return list(dist_map.values())
 
 
-async def get_overdue_tasks(session: Session) -> List["UserOverdueSummary"]:
-    from apps.models.tasks import UserOverdueSummary, OverdueTask, TaskStatus
-    
+async def get_overdue_tasks(session: Session) -> List[TaskOverdueSummary]:    
     current_time = datetime.utcnow()
-    
-    # Query for overdue tasks not done
     stmt = (
         select(User, Task)
         .join(TaskAssignee, User.user_id == TaskAssignee.user_id)
@@ -181,7 +201,7 @@ async def get_overdue_tasks(session: Session) -> List["UserOverdueSummary"]:
     user_map = {}
     for user, task in results:
         if user.user_id not in user_map:
-            user_map[user.user_id] = UserOverdueSummary(
+            user_map[user.user_id] = TaskOverdueSummary(
                 user_id=user.user_id,
                 username=user.username,
                 tasks=[]
