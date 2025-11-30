@@ -19,10 +19,8 @@ app.add_middleware(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     db_manager.init_db()
     yield
-    # Shutdown
     db_manager.close_db()
 
 

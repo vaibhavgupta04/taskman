@@ -22,17 +22,9 @@ class DatabaseManager:
             yield session
 
 
-# Create a global instance
 db_manager = DatabaseManager()
-
-# Convenience functions for backward compatibility
-def init_db():
-    db_manager.init_db()
-
-
-def close_db():
-    db_manager.close_db()
 
 
 def get_session():
-    yield from db_manager.get_session()
+    with Session(db_manager.engine) as session:
+        yield session

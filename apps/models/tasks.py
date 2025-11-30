@@ -116,3 +116,25 @@ class TaskRead(SQLModel):
 class BulkTaskUpdate(SQLModel):
     task_ids: List[int]
     updates: TaskUpdate
+
+
+class TaskDistribution(SQLModel):
+    user_id: int
+    username: str
+    todo: int = 0
+    in_progress: int = 0
+    done: int = 0
+
+
+class OverdueTask(SQLModel):
+    task_id: int
+    title: str
+    due_date: datetime
+    status: TaskStatus
+    priority: TaskPriority
+
+
+class UserOverdueSummary(SQLModel):
+    user_id: int
+    username: str
+    tasks: List[OverdueTask]
