@@ -14,7 +14,7 @@ class AuthManager:
         self.SECRET_KEY = secret_key or os.getenv("SECRET_KEY", "change-me")
         self.ALGORITHM = algorithm or os.getenv("ALGORITHM", "HS256")
         self.ACCESS_TOKEN_EXPIRE_MINUTES = int(
-            access_token_expire_minutes or os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+            access_token_expire_minutes or os.getenv("ACCESS_TOKEN_EXPIRY_TIME", "30")
         )
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:

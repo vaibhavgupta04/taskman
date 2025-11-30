@@ -43,20 +43,6 @@ async def bulk_update_tasks(
 ):
     return await task_crud.bulk_update_tasks(session, bulk_update.task_ids, bulk_update.updates)
 
-@router.get("/distribution", response_model=List[TaskDistribution])
-async def get_task_distribution(
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
-):
-    return await task_crud.get_task_distribution(session)
-
-@router.get("/overdue", response_model=List[UserOverdueSummary])
-async def get_overdue_tasks(
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
-):
-    return await task_crud.get_overdue_tasks(session)
-
 @router.get("/{task_id}", response_model=TaskRead)
 async def get_task(
     task_id: int, 
@@ -117,3 +103,18 @@ async def create_subtask(
         
     subtask.parent_id = task_id
     return await task_crud.create_task(session, subtask)
+
+
+@router.get("/distribution", response_model=List[TaskDistribution])
+async def get_task_distribution(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    return await task_crud.get_task_distribution(session)
+
+@router.get("/overdue", response_model=List[UserOverdueSummary])
+async def get_overdue_tasks(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    return await task_crud.get_overdue_tasks(session)
