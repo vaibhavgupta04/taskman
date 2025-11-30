@@ -23,3 +23,8 @@ class DatabaseManager:
 
 
 db_manager = DatabaseManager()
+
+
+def get_session():
+    with Session(db_manager.engine) as session:
+        yield session

@@ -5,7 +5,7 @@ from sqlmodel import Session
 from apps.stores.db import get_session
 from apps.models.tasks import Task, TaskCreate, TaskUpdate, TaskRead, TaskStatus, TaskPriority, BulkTaskUpdate, TaskDistribution, UserOverdueSummary
 from apps.crud import tasks as task_crud
-from apps.auth.dependencies import get_current_user
+from apps.auth.dependencies import get_current_user, get_current_admin_user
 from apps.models.users import User
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -70,7 +70,7 @@ async def update_task(
 async def delete_task(
     task_id: int, 
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin_user)
 ):
     task = await task_crud.delete_task(session, task_id)
     if not task:
